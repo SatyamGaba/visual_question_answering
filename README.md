@@ -7,7 +7,7 @@ Pytorch implementation of the paper - VQA: Visual Question Answering (https://ar
 ```
 .
 +-- COCO-2015/
-|   +-- images/ (Image of /dataset/COCO2015 from server)
+|   +-- images/ (mounted image of /dataset/COCO2015 from server)
 |       +-- train2014/
 |       +-- ...
 |   +-- resized_images/
