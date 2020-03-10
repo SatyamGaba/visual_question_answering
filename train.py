@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from data_loader import get_loader
-from models import VqaModel
+from models import VqaModel, SANModel
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,7 +30,16 @@ def main(args):
     ans_vocab_size = data_loader['train'].dataset.ans_vocab.vocab_size
     ans_unk_idx = data_loader['train'].dataset.ans_vocab.unk2idx
 
-    model = VqaModel(
+#     model = VqaModel(
+#         embed_size=args.embed_size,
+#         qst_vocab_size=qst_vocab_size,
+#         ans_vocab_size=ans_vocab_size,
+#         word_embed_size=args.word_embed_size,
+#         num_layers=args.num_layers,
+#         hidden_size=args.hidden_size).to(device)
+
+
+    model = SANModel(
         embed_size=args.embed_size,
         qst_vocab_size=qst_vocab_size,
         ans_vocab_size=ans_vocab_size,
@@ -40,10 +49,10 @@ def main(args):
 
     criterion = nn.CrossEntropyLoss()
     
-    params = list(model.img_encoder.fc.parameters()) \
-        + list(model.qst_encoder.parameters()) \
-        + list(model.fc1.parameters()) \
-        + list(model.fc2.parameters())
+#     params = list(model.img_encoder.fc.parameters()) \
+#         + list(model.qst_encoder.parameters()) \
+#         + list(model.fc1.parameters()) \
+#         + list(model.fc2.parameters())
     
     # resume training
     if args.resume_epoch!=0:  
@@ -52,7 +61,7 @@ def main(args):
         model = load_var['model']
         torch.cuda.empty_cache()
 
-    optimizer = optim.Adam(params, lr=args.learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     for epoch in range(args.resume_epoch, args.num_epochs):

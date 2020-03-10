@@ -85,3 +85,80 @@ class VqaModel(nn.Module):
         combined_feature = self.fc2(combined_feature)           # [batch_size, ans_vocab_size=1000]
 
         return combined_feature
+
+class ImgAttentionEncoder(nn.Module):
+
+    def __init__(self, embed_size):
+        """(1) Load the pretrained model as you want.
+               cf) one needs to check structure of model using 'print(model)'
+                   to remove last fc layer from the model.
+           (2) Replace final fc layer (score values from the ImageNet)
+               with new fc layer (image feature).
+           (3) Normalize feature vector.
+        """
+        super(ImgAttentionEncoder, self).__init__()
+        vggnet_feat = models.vgg19(pretrained=True).features
+        modules = list(vggnet_feat.children())[:-2]
+        self.cnn = nn.Sequential(*modules)
+        self.fc = nn.Sequential(nn.Linear(self.cnn[-3].out_channels, embed_size),
+                                nn.Tanh())     # feature vector of image
+
+    def forward(self, image):
+        """Extract feature vector from image vector.
+    #     """
+        with torch.no_grad():
+            img_feature = self.cnn(image)                           # [batch_size, vgg16(19)_fc=4096]
+        img_feature = img_feature.view(-1, 512, 196).transpose(1,2) # [batch_size, 196, 512]
+        img_feature = self.fc(img_feature)                          # [batch_size, 196, embed_size]
+
+        return img_feature
+
+
+class Attention(nn.Module):
+    def __init__(self, num_channels, embed_size, dropout=True):
+        """Stacked attention Module
+        """
+        super(Attention, self).__init__()
+        self.ff_image = nn.Linear(embed_size, num_channels)
+        self.ff_questions = nn.Linear(embed_size, num_channels)
+        self.dropout = nn.Dropout(p=0.5)
+        self.ff_attention = nn.Linear(num_channels, 1)
+
+    def forward(self, vi, vq):
+        """Extract feature vector from image vector.
+
+        """
+        hi = self.ff_image(vi)
+        hq = self.ff_questions(vq).unsqueeze(dim=1)
+        ha = torch.tanh(hi+hq)
+        if self.dropout:
+            ha = self.dropout(ha)
+        ha = self.ff_attention(ha)
+        pi = torch.softmax(ha, dim=1)
+        vi_attended = (pi * vi).sum(dim=1)
+        u = vi_attended + vq
+        return u
+
+class SANModel(nn.Module):
+    # num_attention_layer and num_mlp_layer not implemented yet
+    def __init__(self, embed_size, qst_vocab_size, ans_vocab_size, word_embed_size, num_layers, hidden_size): 
+        super(SANModel, self).__init__()
+        self.num_attention_layer = 1
+        self.num_mlp_layer = 1
+        self.img_encoder = ImgAttentionEncoder(embed_size)
+        self.qst_encoder = QstEncoder(qst_vocab_size, word_embed_size, embed_size, num_layers, hidden_size)
+        self.san = nn.ModuleList([Attention(512, embed_size)]*self.num_attention_layer)
+        self.tanh = nn.Tanh()
+        self.mlp = nn.Sequential(nn.Dropout(p=0.5),
+                            nn.Linear(embed_size, ans_vocab_size))
+
+    def forward(self, img, qst):
+
+        img_feature = self.img_encoder(img)                     # [batch_size, embed_size]
+        qst_feature = self.qst_encoder(qst)                     # [batch_size, embed_size]
+        vi = img_feature
+        u = qst_feature
+        for attn_layer in self.san:
+            u = attn_layer(vi, u)
+        combined_feature = self.mlp(u)
+        return combined_feature
