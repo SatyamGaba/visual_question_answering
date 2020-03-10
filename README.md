@@ -3,6 +3,30 @@ Pytorch implementation of the paper - VQA: Visual Question Answering (https://ar
 
 ![model](./png/basic_model.png)
 
+## Directory and File Structure
+```
+.
++-- COCO-2015/
+|   +-- images/ (Image of /dataset/COCO2015 from server)
+|       +-- train2014/
+|       +-- ...
+|   +-- resized_images/
+|       +-- train2014/
+|       +-- ...
+|       +-- Questions/
+|       +-- Annotations/
+|       +-- train.npy
+|       +-- ...
+|       +-- vocab_questions.txt
+|       +-- vocab_answers.txt
+|   +-- <questions>.json
+|   +-- <annotations>.json
++-- basic_vqa
+|   +-- .git
+|   +-- README.md
+```
+
+
 ## Usage 
 
 #### 1. Clone the repositories.
