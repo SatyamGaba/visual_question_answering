@@ -15,7 +15,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def main(args):
     image = args.image_path.to(device)
     question = args.question.to(device)
-    cv2.resize(image, size=224, interpolation = cv2.INTER_AREA)
+    image = cv2.resize(image, size=224, interpolation = cv2.INTER_AREA)
     #resize_image(image, size = 224)
     model = torch.load(args.saved_model)
     #torch.cuda.empty_cache()
