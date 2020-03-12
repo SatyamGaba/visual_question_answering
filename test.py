@@ -1,4 +1,5 @@
 import argparse
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,7 +7,7 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from data_loader import get_loader
 from models import VqaModel, SANModel
-from resize_images import resize_image
+#from resize_images import resize_image
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -14,8 +15,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def main(args):
     image = args.image_path.to(device)
     question = args.question.to(device)
-    
-    resize_image(image, size = 224)
+    cv2.resize(image, size=224, interpolation = cv2.INTER_AREA)
+    #resize_image(image, size = 224)
     model = torch.load(args.saved_model)
     #torch.cuda.empty_cache()
     model.eval()
