@@ -66,7 +66,7 @@ def main(args):
 
     for epoch in range(args.resume_epoch, args.num_epochs):
 
-        for phase in ['train']: #, 'valid']:
+        for phase in ['train', 'valid']:
 
             running_loss = 0.0
             running_corr_exp1 = 0
@@ -80,8 +80,8 @@ def main(args):
                 model.eval()
 
             for batch_idx, batch_sample in enumerate(data_loader[phase]):
-                if batch_idx == 1:
-                    break
+#                 if batch_idx == 1:
+#                     break
                 
                 image = batch_sample['image'].to(device)
                 question = batch_sample['question'].to(device)
