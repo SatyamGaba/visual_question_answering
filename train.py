@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from data_loader import get_loader
-from models import VqaModel
+from models import VqaModel, SANModel
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -37,14 +37,23 @@ def main(args):
         num_layers=args.num_layers,
         hidden_size=args.hidden_size).to(device)
 
+
+#     model = SANModel(
+#         embed_size=args.embed_size,
+#         qst_vocab_size=qst_vocab_size,
+#         ans_vocab_size=ans_vocab_size,
+#         word_embed_size=args.word_embed_size,
+#         num_layers=args.num_layers,
+#         hidden_size=args.hidden_size).to(device)
+    
     criterion = nn.CrossEntropyLoss()
 
-    params = list(model.img_encoder.fc.parameters()) \
-        + list(model.qst_encoder.parameters()) \
-        + list(model.fc1.parameters()) \
-        + list(model.fc2.parameters())
-
-    optimizer = optim.Adam(params, lr=args.learning_rate)
+    # resume training
+    if args.resume_epoch!=0:  
+        model = torch.load(args.saved_model)
+        torch.cuda.empty_cache()
+    
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     #callbacks = [EarlyStopping(monitor='val_loss', patience=5)]
@@ -55,9 +64,9 @@ def main(args):
     stop_training = False
     prev_loss = 9999
 
-    for epoch in range(args.num_epochs):
+    for epoch in range(args.resume_epoch, args.num_epochs):
 
-        for phase in ['train', 'valid']:
+        for phase in ['train']: #, 'valid']:
 
             running_loss = 0.0
             running_corr_exp1 = 0
@@ -71,7 +80,9 @@ def main(args):
                 model.eval()
 
             for batch_idx, batch_sample in enumerate(data_loader[phase]):
-
+                if batch_idx == 1:
+                    break
+                
                 image = batch_sample['image'].to(device)
                 question = batch_sample['question'].to(device)
                 label = batch_sample['answer_label'].to(device)
@@ -98,13 +109,17 @@ def main(args):
                 running_corr_exp1 += torch.stack([(ans == pred_exp1.cpu()) for ans in multi_choice]).any(dim=0).sum()
                 running_corr_exp2 += torch.stack([(ans == pred_exp2.cpu()) for ans in multi_choice]).any(dim=0).sum()
 
-                # Print the average loss in a mini-batch.
-                if batch_idx % 100 == 0:
-                    print('| {} SET | Epoch [{:02d}/{:02d}], Step [{:04d}/{:04d}], Loss: {:.4f}'
-                          .format(phase.upper(), epoch+1, args.num_epochs, batch_idx, int(batch_step_size), loss.item()))
+                # Print the average loss after every batch.
+                print('| {} SET | Epoch [{:02d}/{:02d}], Step [{:04d}/{:04d}], Loss: {:.4f}'
+                          .format(phase.upper(), epoch+1, args.num_epochs, batch_idx, int(batch_step_size), loss.item()), end='\r')
+#                 if batch_idx % 100 == 0:
+#                     print('| {} SET | Epoch [{:02d}/{:02d}], Step [{:04d}/{:04d}], Loss: {:.4f}'
+#                           .format(phase.upper(), epoch+1, args.num_epochs, batch_idx, int(batch_step_size), loss.item()))
 
             # Print the average loss and accuracy in an epoch.
             epoch_loss = running_loss / batch_step_size
+#             epoch_loss = running_loss / 1  ## to be removed
+#             epoch_acc_exp1 = running_corr_exp1.double() / (args.batch_size * 1)     ## to be removed
             epoch_acc_exp1 = running_corr_exp1.double() / len(data_loader[phase].dataset)      # multiple choice
             epoch_acc_exp2 = running_corr_exp2.double() / len(data_loader[phase].dataset)      # multiple choice
 
@@ -112,8 +127,8 @@ def main(args):
                   .format(phase.upper(), epoch+1, args.num_epochs, epoch_loss, epoch_acc_exp1, epoch_acc_exp2))
 
             # Log the loss and accuracy in an epoch.
-            with open(os.path.join(args.log_dir, '{}-log-epoch-{:02}.txt')
-                      .format(phase, epoch+1), 'w') as f:
+            with open(os.path.join(args.log_dir, '{}-{}-log-epoch-{:02}.txt')
+                      .format(args.model_name, phase, epoch+1), 'w') as f:
                 f.write(str(epoch+1) + '\t'
                         + str(epoch_loss) + '\t'
                         + str(epoch_acc_exp1.item()) + '\t'
@@ -122,7 +137,7 @@ def main(args):
             if phase == 'valid':
                 if epoch_loss < best_loss:
                     best_loss = epoch_loss
-                    torch.save(model, os.path.join(args.model_dir, 'best_model.ckpt'))
+                    torch.save(model, os.path.join(args.model_dir, 'best_model.pt'))
                 if epoch_loss > prev_loss:
                     val_increase_count += 1
                 else:
@@ -132,9 +147,10 @@ def main(args):
                 prev_loss = epoch_loss
         # Save the model check points.
         if (epoch+1) % args.save_step == 0:
-            #torch.save({'epoch': epoch+1, 'state_dict': model.state_dict()},
+#             pass
+#             torch.save({'epoch': epoch+1, 'state_dict': model.state_dict()},
             torch.save(model,
-                       os.path.join(args.model_dir, 'model-epoch-{:02d}.ckpt'.format(epoch+1)))
+                       os.path.join(args.model_dir, '{}-epoch-{:02d}.pt'.format(args.model_name, epoch+1)))
 
         if stop_training:
             break
@@ -142,6 +158,9 @@ def main(args):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--model_name', type=str,
+                        help='model name.') 
 
     parser.add_argument('--input_dir', type=str, default='./datasets',
                         help='input directory for visual question answering.')
@@ -185,7 +204,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', type=int, default=30,
                         help='number of epochs.')
 
-    parser.add_argument('--batch_size', type=int, default=64,
+    parser.add_argument('--batch_size', type=int, default=256,
                         help='batch_size.')
 
     parser.add_argument('--num_workers', type=int, default=8,
@@ -193,6 +212,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--save_step', type=int, default=1,
                         help='save step of model.')
+    
+    parser.add_argument('--resume_epoch', type=int, default = 0,
+                        help='load saved model from which epoch')
+    
+    parser.add_argument('--saved_model', type=str, default = 'best_model.pt',
+                        help='load saved model from which epoch') 
 
     args = parser.parse_args()
 
