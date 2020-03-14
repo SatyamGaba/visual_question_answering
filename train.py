@@ -29,22 +29,22 @@ def main(args):
     ans_vocab_size = data_loader['train'].dataset.ans_vocab.vocab_size
     ans_unk_idx = data_loader['train'].dataset.ans_vocab.unk2idx
 
-    model = VqaModel(
-        embed_size=args.embed_size,
-        qst_vocab_size=qst_vocab_size,
-        ans_vocab_size=ans_vocab_size,
-        word_embed_size=args.word_embed_size,
-        num_layers=args.num_layers,
-        hidden_size=args.hidden_size).to(device)
-
-
-#     model = SANModel(
+#     model = VqaModel(
 #         embed_size=args.embed_size,
 #         qst_vocab_size=qst_vocab_size,
 #         ans_vocab_size=ans_vocab_size,
 #         word_embed_size=args.word_embed_size,
 #         num_layers=args.num_layers,
 #         hidden_size=args.hidden_size).to(device)
+
+
+    model = SANModel(
+        embed_size=args.embed_size,
+        qst_vocab_size=qst_vocab_size,
+        ans_vocab_size=ans_vocab_size,
+        word_embed_size=args.word_embed_size,
+        num_layers=args.num_layers,
+        hidden_size=args.hidden_size).to(device)
     
     criterion = nn.CrossEntropyLoss()
 
@@ -52,13 +52,13 @@ def main(args):
     if args.resume_epoch!=0:  
         model = torch.load(args.saved_model)
         torch.cuda.empty_cache()
-    
+
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     #callbacks = [EarlyStopping(monitor='val_loss', patience=5)]
     #model.set_callbacks(callbacks)
-    early_stop_threshold = 5
+    early_stop_threshold = 3
     best_loss = 99999
     val_increase_count = 0
     stop_training = False
@@ -82,14 +82,12 @@ def main(args):
             for batch_idx, batch_sample in enumerate(data_loader[phase]):
 #                 if batch_idx == 1:
 #                     break
-                
                 image = batch_sample['image'].to(device)
                 question = batch_sample['question'].to(device)
                 label = batch_sample['answer_label'].to(device)
                 multi_choice = batch_sample['answer_multi_choice']  # not tensor, list.
 
                 optimizer.zero_grad()
-
                 with torch.set_grad_enabled(phase == 'train'):
 
                     output = model(image, question)      # [batch_size, ans_vocab_size=1000]
@@ -110,11 +108,9 @@ def main(args):
                 running_corr_exp2 += torch.stack([(ans == pred_exp2.cpu()) for ans in multi_choice]).any(dim=0).sum()
 
                 # Print the average loss after every batch.
-                print('| {} SET | Epoch [{:02d}/{:02d}], Step [{:04d}/{:04d}], Loss: {:.4f}'
-                          .format(phase.upper(), epoch+1, args.num_epochs, batch_idx, int(batch_step_size), loss.item()), end='\r')
-#                 if batch_idx % 100 == 0:
-#                     print('| {} SET | Epoch [{:02d}/{:02d}], Step [{:04d}/{:04d}], Loss: {:.4f}'
-#                           .format(phase.upper(), epoch+1, args.num_epochs, batch_idx, int(batch_step_size), loss.item()))
+                if batch_idx % 1 == 0:
+                    print('| {} SET | Epoch [{:02d}/{:02d}], Step [{:04d}/{:04d}], Loss: {:.4f}'
+                          .format(phase.upper(), epoch+1, args.num_epochs, batch_idx, int(batch_step_size), loss.item()), end = '\r')
 
             # Print the average loss and accuracy in an epoch.
             epoch_loss = running_loss / batch_step_size
