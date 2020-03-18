@@ -135,6 +135,7 @@ class Attention(nn.Module):
             ha = self.dropout(ha)
         ha = self.ff_attention(ha)
         pi = torch.softmax(ha, dim=1)
+        self.pi = pi
         vi_attended = (pi * vi).sum(dim=1)
         u = vi_attended + vq
         return u
@@ -143,7 +144,7 @@ class SANModel(nn.Module):
     # num_attention_layer and num_mlp_layer not implemented yet
     def __init__(self, embed_size, qst_vocab_size, ans_vocab_size, word_embed_size, num_layers, hidden_size): 
         super(SANModel, self).__init__()
-        self.num_attention_layer = 1
+        self.num_attention_layer = 2
         self.num_mlp_layer = 1
         self.img_encoder = ImgAttentionEncoder(embed_size)
         self.qst_encoder = QstEncoder(qst_vocab_size, word_embed_size, embed_size, num_layers, hidden_size)
@@ -151,6 +152,7 @@ class SANModel(nn.Module):
         self.tanh = nn.Tanh()
         self.mlp = nn.Sequential(nn.Dropout(p=0.5),
                             nn.Linear(embed_size, ans_vocab_size))
+        self.attn_features = []  ## attention features
 
     def forward(self, img, qst):
 
@@ -160,5 +162,7 @@ class SANModel(nn.Module):
         u = qst_feature
         for attn_layer in self.san:
             u = attn_layer(vi, u)
+#             self.attn_features.append(attn_layer.pi)
+            
         combined_feature = self.mlp(u)
         return combined_feature
