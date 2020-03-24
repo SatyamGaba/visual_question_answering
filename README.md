@@ -57,31 +57,9 @@ $ cd ..
 $ python train.py
 ```
 
-## Results
-
-- Comparison Result
-
-| Model | Metric | Dataset | Accuracy | Source |
-| --- | --- | --- | --- | --- |
-| Paper Model | Open-Ended | VQA v2 | 54.08 | [VQA Challenge](https://visualqa.org/roe.html) |
-| My Model | Multiple Choice | VQA v2 | **54.72** | |
-
-
-- Loss and Accuracy on VQA datasets v2
-
-![train1](./png/train.png)
-
-
 ## References
 * Paper implementation
-  + Paper: VQA: Visual Question Answering
-  + URL: https://arxiv.org/pdf/1505.00468.pdf
+  + Keywords: Visual Question Answering ; Simple Attention; Stacked Attention; Top-Down Attention;
     
-* Pytorch tutorial
-  + URL: https://pytorch.org/tutorials/
-  + Github: https://github.com/yunjey/pytorch-tutorial
-  + Github: https://github.com/GunhoChoi/PyTorch-FastCampus
-
-* Preprocessing
-  + Tensorflow implementation of N2NNM
-  + Github: https://github.com/ronghanghu/n2nmn
+* Baseline Model
+  + Github: https://github.com/tbmoon/basic_vqa
