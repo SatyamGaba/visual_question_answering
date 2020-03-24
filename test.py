@@ -10,6 +10,9 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from data_loader import get_loader
 from models import VqaModel, SANModel
+import warnings 
+
+warnings.filterwarnings("ignore")
 #from resize_images import resize_image
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,7 +39,19 @@ def load_image(image_path, transform=None):
     
     return image
 
-
+def visualizeAttention(model, img, layer):
+    m = nn.Upsample(size=(224,224), mode='bilinear')
+    pi = model.attn_features[layer].squeeze()
+    print(pi.size())
+    pi = pi.view(14,14)
+    attn = m(pi)
+    
+    image = image.squeeze(0)
+    img = torch.numpy(img)
+    attn  = torch.numpy(attn)
+#     print(image.shape, attn.shape)
+    ## Visualization yet to be completed
+    
 
 def word2idx(w):
     if w in word2idx_dict:
@@ -62,7 +77,7 @@ def main(args):
     
     question = args.question
     q_list = list(question.split(" "))
-    print(q_list)
+#     print(q_list)
     
     idx = 'valid'
     qst2idc = np.array([word2idx('<pad>')] * max_qst_length)  # padded with '<pad>' in 'ans_vocab'
@@ -78,8 +93,20 @@ def main(args):
     #torch.cuda.empty_cache()
     model.eval()
     output = model(image, question)
-    _, pred_exp1 = torch.max(output, 1)
-    print(ans_vocab[pred_exp1.item()])
+      
+#     Visualization yet to be implemented
+#     if model.__class__.__name__ == "SANModel":
+#         print(model.attn_features[0].size())
+#          visualizeAttention(model, image, layer=0)
+    predicts = torch.softmax(output, 1)
+    probs, indices = torch.topk(predicts, k=5, dim=1)
+    probs = probs.squeeze()
+    indices = indices.squeeze()
+    print("predicted - probabilty")
+    for i in range(5):
+#         print(probs.size(), indices.size())
+#         print(ans_vocab[indices[1].item()],probs[1].item())
+        print("'{}' - {:.4f}".format(ans_vocab[indices[i].item()], probs[i].item()))
 
 
 if __name__ == '__main__':
